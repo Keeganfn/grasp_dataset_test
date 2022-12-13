@@ -55,7 +55,7 @@ class GraspDatasetTrajectories(object):
       #self.remove_box("cube")
       #self.add_box(pos=[.5,0,.05], dim=[.04,.04,.1], name="cube")
       #self.remove_box("cam_stand")
-      self.add_box(pos=[.58,0,.9], dim=[.1, .1, .5], name="cam_stand")
+      self.add_box(pos=[.62,0,.9], dim=[.1, .1, .5], name="cam_stand")
       #self.remove_box("backdrop")
       self.add_box(pos=[1.08,0,.5], dim=[.1, 2, 1], name="backdrop")
       #self.remove_box("top")
@@ -69,6 +69,108 @@ class GraspDatasetTrajectories(object):
     else:
       self.is_init_success = True
   
+  def test_pose_list(self):
+    success = self.is_init_success
+    self.pose_list = []
+
+    self.remove_box("cube")
+    rospy.loginfo("Opening the gripper...")
+    self.reach_gripper_position(0)
+    self.arm_group.set_end_effector_link("tool_frame")
+    #Start Position
+    start_point=[.58,0,.1]
+    actual_pose = deepcopy(self.get_cartesian_pose())
+    actual_pose.position.x = start_point[0]
+    actual_pose.position.y = start_point[1]
+    actual_pose.position.z = start_point[2]
+    #rotate end effector facing table
+    q_down= quaternion_from_euler(0, 1.5708, 0) 
+    current_q = [actual_pose.orientation.x, actual_pose.orientation.y, actual_pose.orientation.z, actual_pose.orientation.w]
+    q_new = quaternion_multiply(q_down, current_q)
+    actual_pose.orientation.x = q_new[0]
+    actual_pose.orientation.y = q_new[1]
+    actual_pose.orientation.z = q_new[2]
+    actual_pose.orientation.w = q_new[3]
+    start_pose_top = deepcopy(actual_pose)
+    # Start Position
+    start_point=[.57,0,.07]
+    actual_pose = deepcopy(self.get_cartesian_pose())
+    actual_pose.position.x = start_point[0]
+    actual_pose.position.y = start_point[1]
+    actual_pose.position.z = start_point[2]
+    #rotate end effector facing table
+    q_down= quaternion_from_euler(0, 0, 0) 
+    current_q = [actual_pose.orientation.x, actual_pose.orientation.y, actual_pose.orientation.z, actual_pose.orientation.w]
+    q_new = quaternion_multiply(q_down, current_q)
+    actual_pose.orientation.x = q_new[0]
+    actual_pose.orientation.y = q_new[1]
+    actual_pose.orientation.z = q_new[2]
+    actual_pose.orientation.w = q_new[3]
+    start_pose_side = deepcopy(actual_pose)
+
+    for i in range(3):
+      if i == 0:
+        self.pose_list = []
+        self.generate_poses_top_XROT()
+      elif i == 1:
+        self.pose_list = []
+        self.generate_poses_top_YROT()
+      else:
+        self.pose_list = []
+        self.generate_poses_top_ZROT()
+      self.add_box(pos=[.575,0,.05], dim=[.025,.025,.105], name="cube")
+      rospy.loginfo("Reaching Named Target Home...")
+      success = self.reach_named_position("home")
+      if success:
+        rospy.loginfo("Moving to Pose: %s", str(start_pose_top))
+        success = self.reach_cartesian_pose(pose=start_pose_top, tolerance=0.001, constraints=None)
+      if success:
+        success = self.move_cartesion_waypoints(self.pose_list)
+      if success:
+        rospy.loginfo("Reaching Named Target Home...")
+        success = self.reach_named_position("home")
+
+    for i in range(2):
+      if i == 0:
+        self.pose_list = []
+        self.generate_poses_side_ZROT()
+      elif i == 1:
+        self.pose_list = []
+        self.generate_poses_side_XROT()
+      else:
+        self.pose_list = []
+        self.generate_poses_top_ZROT()
+      self.add_box(pos=[.575,0,.05025], dim=[.04,.04,.12], name="cube")
+      self.add_box(pos=[.58,0,.05], dim=[.025,.025,.105], name="cube")
+      rospy.loginfo("Reaching Named Target Home...")
+      success = self.reach_named_position("home")
+      if success:
+        rospy.loginfo("Moving to Pose: %s", str(start_pose_side))
+        success = self.reach_cartesian_pose(pose=start_pose_side, tolerance=0.001, constraints=None)
+      if success:
+        success = self.move_cartesion_waypoints(self.pose_list)
+      if success:
+        rospy.loginfo("Reaching Named Target Home...")
+        success = self.reach_named_position("home")
+
+
+    # rospy.loginfo("Reaching Named Target Home...")
+    # success = self.reach_named_position("home")
+    # if success:
+    #   rospy.loginfo("Moving to Pose: %s", str(start_pose))
+    #   success = self.reach_cartesian_pose(pose=start_pose, tolerance=0.001, constraints=None)
+    # if success:
+    #   success = self.move_cartesion_waypoints(self.pose_list)
+    # if success:
+    #   rospy.loginfo("Reaching Named Target Home...")
+    #   success = self.reach_named_position("home")
+
+  def move_cartesion_waypoints(self, points):
+    waypoints = points
+    plan, fraction = self.arm_group.compute_cartesian_path(waypoints, 0.01,2)    
+    success = self.arm_group.execute(plan)
+    return success
+
   def execute_poses(self):
     success = self.is_init_success
     self.pose_list = []
@@ -82,13 +184,14 @@ class GraspDatasetTrajectories(object):
  
 
     for i in self.pose_list:
-      self.add_box(pos=[.63,0,.05], dim=[.04,.04,.08], name="cube")
+      self.add_box(pos=[.585,0,.05], dim=[.03,.03,.08], name="cube")
       if success:
         rospy.loginfo("Reaching Named Target Home...")
         success = self.reach_named_position("home")
       if success:
         rospy.loginfo("Moving to Pose: %s", str(i))
         success = self.reach_cartesian_pose(pose=i, tolerance=0.001, constraints=None)
+        
         #success = self.plan_cartestian(pose=i)
       if success:
         self.remove_box("cube")
@@ -96,8 +199,6 @@ class GraspDatasetTrajectories(object):
         self.reach_gripper_position(1)
       if success:
         success = self.set_cube_in_goal()
-        print(success)
-      if success:
         rospy.loginfo("Opening the gripper...")
         self.reach_gripper_position(0) 
     if success:
@@ -117,40 +218,6 @@ class GraspDatasetTrajectories(object):
     actual_pose.position.x = .58
     actual_pose.position.y = .25
     actual_pose.position.z = .13
-    # constraints = moveit_msgs.msg.Constraints()
-    # orientation_constraint = moveit_msgs.msg.OrientationConstraint()
-    # orientation_constraint.header.stamp = rospy.Time(0)
-    # orientation_constraint.header.frame_id = "world"
-    # orientation_constraint.link_name = "tool_frame"
-    # orientation_constraint.absolute_x_axis_tolerance = .1
-    # orientation_constraint.absolute_y_axis_tolerance = .1
-    # orientation_constraint.absolute_z_axis_tolerance = .1
-    # orientation_constraint.weight = 1
-    # orientation_constraint.orientation = actual_pose.orientation
-    # #constraint
-    # position_constraint = moveit_msgs.msg.PositionConstraint()
-    # position_constraint.header.stamp = rospy.Time(0)
-    # position_constraint.header.frame_id = "world"
-    # position_constraint.link_name = "tool_frame"
-    # position_constraint.target_point_offset.x = 0
-    # position_constraint.target_point_offset.y = 0
-    # position_constraint.target_point_offset.z = 0
-    # #box shape
-    # box_ = shape_msgs.msg.SolidPrimitive()
-    # box_.type = 1
-    # box_.dimensions = [1,2,.65]
-    # shape_list = [box_]
-    # #box location
-    # box_pose = geometry_msgs.msg.Pose()
-    # box_pose.position.x = .5
-    # box_pose.position.y = 0
-    # box_pose.position.z = .325
-    # shape_pos = [box_pose]
-    # position_constraint.constraint_region.primitives = shape_list
-    # position_constraint.constraint_region.primitive_poses = shape_pos
-    # position_constraint.weight = 2
-    # constraints.orientation_constraints.append(orientation_constraint)
-    # constraints.position_constraints.append(position_constraint)
     waypoints = []
     waypoints.append(deepcopy(actual_pose))
     plan, fraction = self.arm_group.compute_cartesian_path(waypoints, 0.03,5.0)    
@@ -161,8 +228,41 @@ class GraspDatasetTrajectories(object):
     #success = self.reach_cartesian_pose(pose=actual_pose, tolerance=0.02, constraints=None)
     #self.arm_group.clear_path_constraints()
     return success
+  def generate_poses_side_XROT(self, lower=-30, upper=30, start_point=[.57,0,.07], num=10):
+    step_size = (abs(upper) + abs(lower)) / num
+    for i in range(num+1):
+      actual_pose = deepcopy(self.get_cartesian_pose())
+      actual_pose.position.x = start_point[0]
+      actual_pose.position.y = start_point[1]
+      actual_pose.position.z = start_point[2]
+      #rotate end effector facing table
+      q_down = quaternion_from_euler(math.radians(lower + (step_size * i)),0,0)
+      current_q = [actual_pose.orientation.x, actual_pose.orientation.y, actual_pose.orientation.z, actual_pose.orientation.w]
+      q_new = quaternion_multiply(q_down, current_q)
+      actual_pose.orientation.x = q_new[0]
+      actual_pose.orientation.y = q_new[1]
+      actual_pose.orientation.z = q_new[2]
+      actual_pose.orientation.w = q_new[3]
+      self.pose_list.append(actual_pose)
 
-  def generate_poses_top_YROT(self, lower=0, upper=90, start_point=[.63,0,.09], num=5):
+  def generate_poses_side_ZROT(self, lower=-30, upper=30, start_point=[.57,0,.07], num=10):
+    step_size = (abs(upper) + abs(lower)) / num
+    for i in range(num+1):
+      actual_pose = deepcopy(self.get_cartesian_pose())
+      actual_pose.position.x = start_point[0]
+      actual_pose.position.y = start_point[1]
+      actual_pose.position.z = start_point[2]
+      #rotate end effector facing table
+      q_down = quaternion_from_euler(0,0,math.radians(lower + (step_size * i)))
+      current_q = [actual_pose.orientation.x, actual_pose.orientation.y, actual_pose.orientation.z, actual_pose.orientation.w]
+      q_new = quaternion_multiply(q_down, current_q)
+      actual_pose.orientation.x = q_new[0]
+      actual_pose.orientation.y = q_new[1]
+      actual_pose.orientation.z = q_new[2]
+      actual_pose.orientation.w = q_new[3]
+      self.pose_list.append(actual_pose)
+
+  def generate_poses_top_YROT(self, lower=0, upper=90, start_point=[.575,0,.07], num=10):
     step_size = (abs(upper) + abs(lower)) / num
     for i in range(num+1):
       actual_pose = deepcopy(self.get_cartesian_pose())
@@ -180,7 +280,7 @@ class GraspDatasetTrajectories(object):
       self.pose_list.append(actual_pose)
 
 
-  def generate_poses_top_ZROT(self, lower=-20, upper=20, start_point=[.63,0,.09], num=5):
+  def generate_poses_top_ZROT(self, lower=-50, upper=50, start_point=[.58,0,.1], num=10):
     step_size = (abs(upper) + abs(lower)) / num
     for i in range(num+1):
       actual_pose = deepcopy(self.get_cartesian_pose())
@@ -200,21 +300,23 @@ class GraspDatasetTrajectories(object):
       actual_pose.orientation.w = q_new[3]
       self.pose_list.append(actual_pose)
 
-  def generate_poses_top_XROT(self, lower=-20, upper=20, start_point=[.63,0,.09], num=5):
-    #Get up and down case
-    actual_pose = deepcopy(self.get_cartesian_pose())
-    actual_pose.position.x = start_point[0]
-    actual_pose.position.y = start_point[1]
-    actual_pose.position.z = start_point[2]
-    #rotate end effector facing table
-    q_down= quaternion_from_euler(0, 1.5708, 0) 
-    current_q = [actual_pose.orientation.x, actual_pose.orientation.y, actual_pose.orientation.z, actual_pose.orientation.w]
-    q_new = quaternion_multiply(q_down, current_q)
-    actual_pose.orientation.x = q_new[0]
-    actual_pose.orientation.y = q_new[1]
-    actual_pose.orientation.z = q_new[2]
-    actual_pose.orientation.w = q_new[3]
-    self.pose_list.append(actual_pose)
+
+
+  def generate_poses_top_XROT(self, lower=-40, upper=40, start_point=[.58,0,.1], num=20):
+    # #Get up and down case
+    # actual_pose = deepcopy(self.get_cartesian_pose())
+    # actual_pose.position.x = start_point[0]
+    # actual_pose.position.y = start_point[1]
+    # actual_pose.position.z = start_point[2]
+    # #rotate end effector facing table
+    # q_down= quaternion_from_euler(0, 1.5708, 0) 
+    # current_q = [actual_pose.orientation.x, actual_pose.orientation.y, actual_pose.orientation.z, actual_pose.orientation.w]
+    # q_new = quaternion_multiply(q_down, current_q)
+    # actual_pose.orientation.x = q_new[0]
+    # actual_pose.orientation.y = q_new[1]
+    # actual_pose.orientation.z = q_new[2]
+    # actual_pose.orientation.w = q_new[3]
+    # self.pose_list.append(actual_pose)
  
     step_size = (abs(upper) + abs(lower)) / num
     for i in range(num+1):
@@ -355,7 +457,8 @@ class GraspDatasetTrajectories(object):
 
 def main():
   example = GraspDatasetTrajectories()
-  example.execute_poses()
+  # example.execute_poses()
+  example.test_pose_list()
 
 if __name__ == '__main__':
   main()
