@@ -15,6 +15,8 @@ from tf.transformations import *
 import math
 import shape_msgs.msg
 from copy import deepcopy
+import actionlib
+from infrastructure_msgs.msg import StageAction, StageGoal, StageFeedback, StageResult
 
 class GraspDatasetTrajectories(object):
   """ExampleMoveItTrajectories"""
@@ -48,7 +50,10 @@ class GraspDatasetTrajectories(object):
         gripper_group_name = "gripper"
         self.gripper_group = moveit_commander.MoveGroupCommander(gripper_group_name, ns=rospy.get_namespace())
 
+
       rospy.loginfo("Initializing node in namespace " + rospy.get_namespace())
+      self.start_arm = actionlib.SimpleActionServer("start_arm_sequence", StageAction, self.start_arm_sequence_callback, False) 
+      self.start_arm.start()
       #self.remove_box("base")
       self.add_box(pos=[.75,0,-.05], dim=[2,2,.1], name="based")
       rospy.sleep(1)
@@ -62,14 +67,90 @@ class GraspDatasetTrajectories(object):
       self.add_box(pos=[.08,0,1.1], dim=[1, 1, .1], name="top")
       self.add_box(pos=[.75,0,-.05], dim=[2,2,.1], name="based2")
 
-
+      self.generate_poses_top_XROT()
+      self.generate_poses_top_YROT()
+      self.generate_poses_top_ZROT()
     except Exception as e:
       print (e)
       self.is_init_success = False
     else:
       self.is_init_success = True
   
+  def start_arm_sequence_callback(self, goal):	
+    self.start_arm.publish_feedback(StageFeedback(status="EXAMPLE: GRABBING OBJECT"))
+    ###do any arm calls or work here
+    success = self.is_init_success
+
+
+    #self.generate_poses_top_YROT()
+    self.remove_box("cube")
+    rospy.loginfo("Opening the gripper...")
+    self.reach_gripper_position(0)
+    self.arm_group.set_end_effector_link("tool_frame")
+
+    i = self.pose_list.pop()
+    self.add_box(pos=[.5,0,.05], dim=[.04,.04,.1], name="cube")
+    if success:
+      rospy.loginfo("Reaching Named Target Home...")
+      success = self.reach_named_position("home")
+    if success:
+      rospy.loginfo("Moving to Pose: %s", str(i))
+      success = self.reach_cartesian_pose(pose=i, tolerance=0.001, constraints=None)
+      #success = self.plan_cartestian(pose=i)
+    if success:
+      self.remove_box("cube")
+      rospy.loginfo("Closing the gripper...")
+      self.reach_gripper_position(1)
+    if success:
+      success = self.set_cube_in_goal()
+      print(success)
+    if success:
+      rospy.loginfo("Opening the gripper...")
+      self.reach_gripper_position(0) 
+    if success:
+      rospy.loginfo("Reaching Named Target Home...")
+      success = self.reach_named_position("home")
+
+      
+    self.start_arm.set_succeeded(StageResult(result = 0), text="SUCCESS")
+
+
+
   def execute_poses(self):
+    # success = self.is_init_success
+    # self.pose_list = []
+    # #self.generate_poses_top_XROT()
+    # #self.generate_poses_top_ZROT()
+    # self.generate_poses_top_YROT()
+    # self.remove_box("cube")
+    # rospy.loginfo("Opening the gripper...")
+    # self.reach_gripper_position(0)
+    # self.arm_group.set_end_effector_link("tool_frame")
+ 
+
+    # for i in self.pose_list:
+    #   self.add_box(pos=[.66,0,.05], dim=[.039,.039,.08], name="cube")
+    #   if success:
+    #     rospy.loginfo("Reaching Named Target Home...")
+    #     success = self.reach_named_position("home")
+    #   if success:
+    #     rospy.loginfo("Moving to Pose: %s", str(i))
+    #     success = self.reach_cartesian_pose(pose=i, tolerance=0.001, constraints=None)
+    #     #success = self.plan_cartestian(pose=i)
+    #   if success:
+    #     self.remove_box("cube")
+    #     rospy.loginfo("Closing the gripper...")
+    #     self.reach_gripper_position(1)
+    #   if success:
+    #     success = self.set_cube_in_goal()
+    #     print(success)
+    #   if success:
+    #     rospy.loginfo("Opening the gripper...")
+    #     self.reach_gripper_position(0) 
+    # if success:
+    #   rospy.loginfo("Reaching Named Target Home...")
+    #   success = self.reach_named_position("home")
+
     success = self.is_init_success
     self.pose_list = []
     self.generate_poses_top_XROT()
@@ -77,32 +158,33 @@ class GraspDatasetTrajectories(object):
     self.generate_poses_top_YROT()
     self.remove_box("cube")
     rospy.loginfo("Opening the gripper...")
-    self.reach_gripper_position(0)
+    success &= self.reach_gripper_position(0)
     self.arm_group.set_end_effector_link("tool_frame")
  
-
-    for i in self.pose_list:
-      self.add_box(pos=[.63,0,.05], dim=[.04,.04,.08], name="cube")
+    if success:
+      for i in self.pose_list:
+        self.add_box(pos=[.55,0,.05], dim=[.04,.04,.1], name="cube")
+        if success:
+          rospy.loginfo("Reaching Named Target Home...")
+          success = self.reach_named_position("home")
+        if success:
+          rospy.loginfo("Moving to Pose: %s", str(i))
+          success = self.reach_cartesian_pose(pose=i, tolerance=0.001, constraints=None)
+          #success = self.plan_cartestian(pose=i)
+        if success:
+          self.remove_box("cube")
+          rospy.sleep(1)
+          rospy.loginfo("Closing the gripper...")
+          success = self.reach_gripper_position(1)
+        if success:
+          success = self.set_cube_in_goal()
+          print(success)
+        if success:
+          rospy.loginfo("Opening the gripper...")
+          success = self.reach_gripper_position(0) 
       if success:
         rospy.loginfo("Reaching Named Target Home...")
         success = self.reach_named_position("home")
-      if success:
-        rospy.loginfo("Moving to Pose: %s", str(i))
-        success = self.reach_cartesian_pose(pose=i, tolerance=0.001, constraints=None)
-        #success = self.plan_cartestian(pose=i)
-      if success:
-        self.remove_box("cube")
-        rospy.loginfo("Closing the gripper...")
-        self.reach_gripper_position(1)
-      if success:
-        success = self.set_cube_in_goal()
-        print(success)
-      if success:
-        rospy.loginfo("Opening the gripper...")
-        self.reach_gripper_position(0) 
-    if success:
-      rospy.loginfo("Reaching Named Target Home...")
-      success = self.reach_named_position("home")
 
   def plan_cartestian(self, pose):
     waypoints = []
@@ -116,7 +198,7 @@ class GraspDatasetTrajectories(object):
     actual_pose = self.get_cartesian_pose()
     actual_pose.position.x = .58
     actual_pose.position.y = .25
-    actual_pose.position.z = .13
+    actual_pose.position.z = .2
     # constraints = moveit_msgs.msg.Constraints()
     # orientation_constraint = moveit_msgs.msg.OrientationConstraint()
     # orientation_constraint.header.stamp = rospy.Time(0)
@@ -162,7 +244,7 @@ class GraspDatasetTrajectories(object):
     #self.arm_group.clear_path_constraints()
     return success
 
-  def generate_poses_top_YROT(self, lower=0, upper=90, start_point=[.63,0,.09], num=5):
+  def generate_poses_top_YROT(self, lower=0, upper=90, start_point=[.59,0.01,.09], num=5):
     step_size = (abs(upper) + abs(lower)) / num
     for i in range(num+1):
       actual_pose = deepcopy(self.get_cartesian_pose())
@@ -180,7 +262,7 @@ class GraspDatasetTrajectories(object):
       self.pose_list.append(actual_pose)
 
 
-  def generate_poses_top_ZROT(self, lower=-20, upper=20, start_point=[.63,0,.09], num=5):
+  def generate_poses_top_ZROT(self, lower=-20, upper=20, start_point=[.59,0.01,.1], num=5):
     step_size = (abs(upper) + abs(lower)) / num
     for i in range(num+1):
       actual_pose = deepcopy(self.get_cartesian_pose())
@@ -200,7 +282,7 @@ class GraspDatasetTrajectories(object):
       actual_pose.orientation.w = q_new[3]
       self.pose_list.append(actual_pose)
 
-  def generate_poses_top_XROT(self, lower=-20, upper=20, start_point=[.63,0,.09], num=5):
+  def generate_poses_top_XROT(self, lower=-20, upper=20, start_point=[.59,0.01,.09], num=5):
     #Get up and down case
     actual_pose = deepcopy(self.get_cartesian_pose())
     actual_pose.position.x = start_point[0]
@@ -355,7 +437,7 @@ class GraspDatasetTrajectories(object):
 
 def main():
   example = GraspDatasetTrajectories()
-  example.execute_poses()
+  #example.execute_poses()
 
 if __name__ == '__main__':
   main()
